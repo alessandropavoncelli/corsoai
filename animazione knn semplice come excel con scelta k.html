@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<title>K-Means passo-passo — k configurabile</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --changed: #ef4444;
+    --grid: #334155;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #1e293b, #0b1220 70%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+  }
+
+  .stage {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .canvas-wrap {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+  }
+
+  canvas {
+    display: block;
+    background: #0b1220;
+    border-radius: 10px;
+  }
+
+  .info {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 20px;
+    min-width: 280px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+  }
+
+  .info h2 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #33415555;
+    font-size: 0.95rem;
+  }
+  .stat:last-child { border-bottom: none; }
+
+  .k-selector {
+    margin: 16px 0 4px;
+    padding-top: 14px;
+    border-top: 1px solid #33415555;
+  }
+
+  .k-selector label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .k-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .k-buttons button {
+    flex: 1;
+    min-width: 38px;
+    padding: 8px 0;
+    background: #334155;
+    color: var(--text);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .k-buttons button:hover { background: #475569; }
+  .k-buttons button.active {
+    background: #2563eb;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  }
+
+  .legend {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.9rem;
+  }
+  .legend-item { display: flex; align-items: center; gap: 10px; }
+
+  .marker {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .marker.changed {
+    background: transparent !important;
+    border: 2px solid var(--changed);
+    width: 16px; height: 16px;
+  }
+  .marker.centroid {
+    background: transparent !important;
+    border: 2px solid white;
+    border-radius: 50%;
+    position: relative;
+    width: 14px; height: 14px;
+  }
+  .marker.centroid::before,
+  .marker.centroid::after {
+    content: ""; position: absolute; background: white;
+  }
+  .marker.centroid::before {
+    top: 50%; left: 2px; right: 2px; height: 1.5px;
+    transform: translateY(-50%);
+  }
+  .marker.centroid::after {
+    left: 50%; top: 2px; bottom: 2px; width: 1.5px;
+    transform: translateX(-50%);
+  }
+
+  .controls {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+
+  button.action {
+    background: #334155;
+    color: var(--text);
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  button.action:hover { background: #475569; }
+  button.action:active { transform: scale(0.97); }
+  button.action.primary { background: #2563eb; }
+  button.action.primary:hover { background: #1d4ed8; }
+
+  .slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    padding: 8px 14px;
+    border-radius: 10px;
+  }
+  input[type=range] {
+    width: 180px;
+    accent-color: #2563eb;
+  }
+</style>
+</head>
+<body>
+
+  <h1>K-Means passo-passo</h1>
+  <div class="subtitle">Algoritmo K-Means — numero di cluster configurabile</div>
+
+  <div class="stage">
+    <div class="canvas-wrap">
+      <canvas id="chart" width="720" height="620"></canvas>
+    </div>
+
+    <div class="info">
+      <h2>Stato corrente</h2>
+      <div class="stat"><span>Cluster (k)</span><b id="s-k">2</b></div>
+      <div class="stat"><span>Iterazione</span><b id="s-iter">1</b></div>
+      <div class="stat"><span>SSE</span><b id="s-sse">0.00</b></div>
+      <div class="stat"><span>Punti cambiati</span><b id="s-changed">0</b></div>
+      <div class="stat"><span>Stato</span><b id="s-status">In corso</b></div>
+
+      <div class="k-selector">
+        <label>Numero di cluster</label>
+        <div class="k-buttons" id="k-buttons">
+          <!-- popolato via JS -->
+        </div>
+      </div>
+
+      <div class="legend" id="legend">
+        <!-- popolata via JS -->
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="action" id="btn-restart">⟲ Reset</button>
+    <button class="action" id="btn-prev">◀ Indietro</button>
+    <button class="action primary" id="btn-play">▶ Play</button>
+    <button class="action" id="btn-next">Avanti ▶</button>
+
+    <div class="slider-wrap">
+      <label for="slider">Iterazione</label>
+      <input type="range" id="slider" min="1" max="1" value="1">
+    </div>
+  </div>
+
+<script>
+// ============================================================
+// 0. COLORI PER I CLUSTER (fino a 6)
+// ============================================================
+const CLUSTER_COLORS = [
+  "#3b82f6", // blu
+  "#f97316", // arancione
+  "#10b981", // verde
+  "#a855f7", // viola
+  "#eab308", // giallo
+  "#ec4899", // rosa
+];
+const CHANGED_COLOR = "#ef4444";
+
+// ============================================================
+// 1. GENERAZIONE DEI 50 PUNTI (seed fisso)
+// ============================================================
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(42);
+
+function gaussian(mean, sd) {
+  const u = Math.max(rand(), 1e-9);
+  const v = rand();
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  return mean + z * sd;
+}
+
+const GROUP1 = { cx: 2.5, cy: 2.5, spread: 1.6 };
+const GROUP2 = { cx: 7.0, cy: 2.5, spread: 1.6 };
+
+const X = [];
+for (let i = 0; i < 25; i++) {
+  X.push([
+    +gaussian(GROUP1.cx, GROUP1.spread * 0.6).toFixed(2),
+    +gaussian(GROUP1.cy, GROUP1.spread * 0.6).toFixed(2),
+  ]);
+}
+for (let i = 0; i < 25; i++) {
+  X.push([
+    +gaussian(GROUP2.cx, GROUP2.spread * 0.6).toFixed(2),
+    +gaussian(GROUP2.cy, GROUP2.spread * 0.6).toFixed(2),
+  ]);
+}
+const N = X.length;
+
+// ============================================================
+// 2. INIZIALIZZAZIONE ETICHETTE (k variabile)
+// ------------------------------------------------------------
+// Distribuisce i punti in modo ROUND-ROBIN tra i k cluster,
+// così l'animazione mostra tanti cambi già dalla prima iterazione.
+// ============================================================
+function makeInitialLabels(n, k) {
+  return Array.from({ length: n }, (_, i) => (i % k) + 1); // 1-based
+}
+
+// ============================================================
+// 3. ALGORITMO K-MEANS
+// ============================================================
+function computeSteps(X, initialLabels, nClusters, maxIter = 30) {
+  let labels = initialLabels.map(v => v - 1);
+  const steps = [];
+  let prevLabels = null;
+
+  for (let it = 0; it < maxIter; it++) {
+    // --- Centroidi ---
+    const centroids = [];
+    for (let k = 0; k < nClusters; k++) {
+      const pts = X.filter((_, i) => labels[i] === k);
+      if (pts.length === 0) centroids.push([NaN, NaN]);
+      else {
+        const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+        const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+        centroids.push([cx, cy]);
+      }
+    }
+
+    // --- Punti cambiati ---
+    const changed = labels.map((l, i) =>
+      prevLabels === null ? false : l !== prevLabels[i]
+    );
+
+    // --- SSE ---
+    let sse = 0;
+    for (let i = 0; i < N; i++) {
+      const c = centroids[labels[i]];
+      if (!isNaN(c[0])) {
+        sse += (X[i][0] - c[0]) ** 2 + (X[i][1] - c[1]) ** 2;
+      }
+    }
+
+    steps.push({
+      labels: [...labels],
+      centroids: centroids.map(c => [...c]),
+      changed: [...changed],
+      sse,
+    });
+
+    // --- Ri-assegnazione ---
+    const newLabels = X.map(p => {
+      let best = 0, bestD = Infinity;
+      for (let k = 0; k < nClusters; k++) {
+        const c = centroids[k];
+        if (isNaN(c[0])) continue;
+        const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2;
+        if (d < bestD) { bestD = d; best = k; }
+      }
+      return best;
+    });
+
+    prevLabels = [...labels];
+    labels = newLabels;
+
+    // --- Convergenza ---
+    const same = labels.every((l, i) => l === prevLabels[i]);
+    if (same) {
+      const centroids2 = [];
+      for (let k = 0; k < nClusters; k++) {
+        const pts = X.filter((_, i) => labels[i] === k);
+        if (pts.length === 0) centroids2.push([NaN, NaN]);
+        else {
+          const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+          const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+          centroids2.push([cx, cy]);
+        }
+      }
+      let sse2 = 0;
+      for (let i = 0; i < N; i++) {
+        const c = centroids2[labels[i]];
+        if (!isNaN(c[0])) sse2 += (X[i][0] - c[0]) ** 2 + (X[i][1] - c[1]) ** 2;
+      }
+      steps.push({
+        labels: [...labels],
+        centroids: centroids2,
+        changed: labels.map(() => false),
+        sse: sse2,
+        converged: true,
+      });
+      break;
+    }
+  }
+
+  return steps;
+}
+
+// ============================================================
+// 4. CANVAS & SCALA
+// ============================================================
+const canvas = document.getElementById("chart");
+const ctx = canvas.getContext("2d");
+const W = canvas.width;
+const H = canvas.height;
+const PAD = 50;
+
+const xs = X.map(p => p[0]);
+const ys = X.map(p => p[1]);
+const xMin = Math.min(...xs) - 1;
+const xMax = Math.max(...xs) + 1;
+const yMin = Math.min(...ys) - 1;
+const yMax = Math.max(...ys) + 1;
+
+const scaleX = (W - 2 * PAD) / (xMax - xMin);
+const scaleY = (H - 2 * PAD) / (yMax - yMin);
+const scale = Math.min(scaleX, scaleY);
+
+const offsetX = (W - (xMax - xMin) * scale) / 2;
+const offsetY = (H - (yMax - yMin) * scale) / 2;
+
+function toPx(x, y) {
+  const px = offsetX + (x - xMin) * scale;
+  const py = H - offsetY - (y - yMin) * scale;
+  return [px, py];
+}
+
+// --- Dimensioni marker ---
+const POINT_R    = 6;
+const CHANGED_R  = 7;
+const CENTROID_R = 9;
+
+// ============================================================
+// 5. STATO GLOBALE
+// ============================================================
+let K = 2;                    // numero cluster corrente
+let steps = [];               // step calcolati
+let TOTAL = 0;                // numero di step
+let current = 0;              // step corrente
+let playing = false;
+let timer = null;
+const INTERVAL = 1000;
+
+// Riferimenti UI
+const btnPlay = document.getElementById("btn-play");
+const btnNext = document.getElementById("btn-next");
+const btnPrev = document.getElementById("btn-prev");
+const btnRestart = document.getElementById("btn-restart");
+const slider = document.getElementById("slider");
+const legendEl = document.getElementById("legend");
+const kButtonsEl = document.getElementById("k-buttons");
+
+// ============================================================
+// 6. DISEGNO
+// ============================================================
+function drawGrid() {
+  ctx.fillStyle = "#0b1220";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth = 1;
+  for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+    const [px] = toPx(x, 0);
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, H);
+    ctx.stroke();
+  }
+  for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+    const [, py] = toPx(0, y);
+    ctx.beginPath();
+    ctx.moveTo(0, py);
+    ctx.lineTo(W, py);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "#475569";
+  ctx.lineWidth = 2;
+  const [x0] = toPx(0, 0);
+  const [, y0] = toPx(0, 0);
+  if (x0 >= 0 && x0 <= W) {
+    ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0, H); ctx.stroke();
+  }
+  if (y0 >= 0 && y0 <= H) {
+    ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke();
+  }
+
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "12px system-ui";
+  ctx.textAlign = "center";
+  for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+    if (x === 0) continue;
+    const [px, py] = toPx(x, 0);
+    ctx.fillText(x, px, Math.min(Math.max(py + 16, 16), H - 6));
+  }
+  ctx.textAlign = "right";
+  for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+    if (y === 0) continue;
+    const [px, py] = toPx(0, y);
+    ctx.fillText(y, Math.min(Math.max(px - 6, 20), W - 6), py + 4);
+  }
+
+  ctx.fillStyle = "#64748b";
+  ctx.textAlign = "center";
+  ctx.fillText("X", W - 20, H - 12);
+  ctx.save();
+  ctx.translate(16, 24);
+  ctx.fillText("Y", 0, 0);
+  ctx.restore();
+}
+
+function drawStep(idx) {
+  if (!steps.length) return;
+  const s = steps[idx];
+  drawGrid();
+
+  // --- Punti ---
+  for (let i = 0; i < N; i++) {
+    const [px, py] = toPx(X[i][0], X[i][1]);
+
+    if (s.changed[i]) {
+      // Punto che ha cambiato cluster
+      ctx.beginPath();
+      ctx.arc(px, py, CHANGED_R + 6, 0, Math.PI * 2);
+      ctx.fillStyle = CHANGED_COLOR + "33";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(px, py, CHANGED_R, 0, Math.PI * 2);
+      ctx.fillStyle = CHANGED_COLOR;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+    } else {
+      const k = s.labels[i];
+      ctx.beginPath();
+      ctx.arc(px, py, POINT_R, 0, Math.PI * 2);
+      ctx.fillStyle = CLUSTER_COLORS[k % CLUSTER_COLORS.length];
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.stroke();
+    }
+  }
+
+  // --- Centroidi ---
+  for (let k = 0; k < K; k++) {
+    const c = s.centroids[k];
+    if (isNaN(c[0])) continue;
+    const [px, py] = toPx(c[0], c[1]);
+    const color = CLUSTER_COLORS[k % CLUSTER_COLORS.length];
+
+    // alone
+    ctx.beginPath();
+    ctx.arc(px, py, CENTROID_R + 5, 0, Math.PI * 2);
+    ctx.fillStyle = color + "33";
+    ctx.fill();
+
+    // X centrale
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 3;
+    const xHalf = 5.5;
+    ctx.beginPath();
+    ctx.moveTo(px - xHalf, py - xHalf); ctx.lineTo(px + xHalf, py + xHalf);
+    ctx.moveTo(px + xHalf, py - xHalf); ctx.lineTo(px - xHalf, py + xHalf);
+    ctx.stroke();
+
+    // bordo colorato
+    ctx.beginPath();
+    ctx.arc(px, py, CENTROID_R, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // etichetta
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 12px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(`C${k + 1}`, px + 14, py - 12);
+  }
+
+  // --- Info ---
+  document.getElementById("s-k").textContent = K;
+  document.getElementById("s-iter").textContent = `${idx + 1} / ${TOTAL}`;
+  document.getElementById("s-sse").textContent = s.sse.toFixed(2);
+  document.getElementById("s-changed").textContent = s.changed.filter(Boolean).length;
+  document.getElementById("s-status").textContent =
+    s.converged ? "✓ Convergenza" : "In corso";
+}
+
+// ============================================================
+// 7. LEGENDA & SELETTORE K
+// ============================================================
+function rebuildLegend() {
+  legendEl.innerHTML = "";
+
+  // Una voce per ogni cluster
+  for (let k = 0; k < K; k++) {
+    const div = document.createElement("div");
+    div.className = "legend-item";
+    div.innerHTML = `<span class="marker" style="background:${CLUSTER_COLORS[k % CLUSTER_COLORS.length]}"></span> Cluster ${k + 1}`;
+    legendEl.appendChild(div);
+  }
+
+  // Punto cambiato
+  const c = document.createElement("div");
+  c.className = "legend-item";
+  c.innerHTML = `<span class="marker changed"></span> Punto che ha cambiato cluster`;
+  legendEl.appendChild(c);
+
+  // Centroide
+  const ce = document.createElement("div");
+  ce.className = "legend-item";
+  ce.innerHTML = `<span class="marker centroid"></span> Centroide`;
+  legendEl.appendChild(ce);
+}
+
+function rebuildKButtons() {
+  kButtonsEl.innerHTML = "";
+  for (let k = 2; k <= 6; k++) {
+    const b = document.createElement("button");
+    b.textContent = k;
+    b.dataset.k = k;
+    if (k === K) b.classList.add("active");
+    b.addEventListener("click", () => {
+      if (K === k) return;
+      K = k;
+      restart();
+    });
+    kButtonsEl.appendChild(b);
+  }
+}
+
+function updateKButtonsActive() {
+  [...kButtonsEl.children].forEach(b => {
+    b.classList.toggle("active", parseInt(b.dataset.k, 10) === K);
+  });
+}
+
+// ============================================================
+// 8. INIZIALIZZAZIONE / RESET
+// ============================================================
+function restart() {
+  pause();
+  const initialLabels = makeInitialLabels(N, K);
+  steps = computeSteps(X, initialLabels, K);
+  TOTAL = steps.length;
+  current = 0;
+  slider.max = TOTAL;
+  slider.value = 1;
+  rebuildLegend();
+  updateKButtonsActive();
+  render();
+}
+
+// ============================================================
+// 9. CONTROLLI
+// ============================================================
+function render() {
+  drawStep(current);
+  slider.value = current + 1;
+}
+
+function goTo(idx) {
+  current = Math.max(0, Math.min(TOTAL - 1, idx));
+  render();
+}
+
+function play() {
+  if (playing) return;
+  playing = true;
+  btnPlay.textContent = "⏸ Pausa";
+  timer = setInterval(() => {
+    if (current >= TOTAL - 1) {
+      pause();
+      return;
+    }
+    goTo(current + 1);
+  }, INTERVAL);
+}
+
+function pause() {
+  playing = false;
+  btnPlay.textContent = "▶ Play";
+  clearInterval(timer);
+}
+
+btnPlay.addEventListener("click", () => (playing ? pause() : play()));
+btnNext.addEventListener("click", () => { pause(); goTo(current + 1); });
+btnPrev.addEventListener("click", () => { pause(); goTo(current - 1); });
+btnRestart.addEventListener("click", () => { pause(); restart(); });
+
+slider.addEventListener("input", (e) => {
+  pause();
+  goTo(parseInt(e.target.value, 10) - 1);
+});
+
+// ============================================================
+// 10. AVVIO
+// ============================================================
+rebuildKButtons();
+restart();
+</script>
+</body>
+</html>

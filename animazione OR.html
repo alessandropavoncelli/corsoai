@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>La Rete Umana impara lo OR</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #fff;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { color: #38bdf8; margin-bottom: 5px; }
+  .subtitle { color: #94a3b8; margin-top: 0; font-size: 14px; }
+  .hint { color: #7dd3fc; font-style: italic; font-size: 13px; }
+
+  .pattern-selector {
+    margin: 15px auto;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pattern-btn {
+    background: #334155;
+    color: #e2e8f0;
+    border: 2px solid #64748b;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: all 0.2s;
+  }
+  .pattern-btn:hover { background: #475569; transform: translateY(-2px); }
+  .pattern-btn.active {
+    background: #8b5cf6 !important;
+    border-color: #a78bfa !important;
+    box-shadow: 0 0 12px #8b5cf6;
+  }
+  .pattern-btn.correct { background: #16a34a; border-color: #22c55e; }
+  .pattern-btn.wrong   { background: #dc2626; border-color: #ef4444; }
+  .pattern-btn.active.correct,
+  .pattern-btn.active.wrong { background: #8b5cf6 !important; border-color: #a78bfa !important; }
+
+  .stage {
+    position: relative;
+    height: 520px;
+    max-width: 1100px;
+    margin: 20px auto;
+    background: #1e293b;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .layer-label {
+    position: absolute;
+    top: 15px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .lbl-input  { left: 15%; }
+  .lbl-output { left: 58%; }
+  .lbl-judge  { left: 85%; }
+
+  .node {
+    position: absolute;
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: #334155;
+    border: 3px solid #64748b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 13px;
+    transition: all 0.3s;
+    z-index: 3;
+    line-height: 1.15;
+    cursor: help;
+    user-select: none;
+  }
+  .node .name { font-size: 13px; }
+  .node .sum {
+    font-size: 16px;
+    color: #fbbf24;
+    margin-top: 3px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+  }
+  .node .act {
+    font-size: 11px;
+    color: #cbd5e1;
+    margin-top: 2px;
+    font-family: 'Courier New', monospace;
+  }
+  .node.active { background: #22c55e; border-color: #4ade80; box-shadow: 0 0 22px #22c55e; }
+  .node.active .sum { color: #052e16; }
+  .node.active .act { color: #052e16; }
+  .node.error { background: #ef4444; border-color: #f87171; box-shadow: 0 0 22px #ef4444; }
+  .node.error .sum { color: #450a0a; }
+  .node.error .act { color: #450a0a; }
+  .node:hover { transform: scale(1.08); filter: brightness(1.2); z-index: 10; }
+
+  .judge-node { border-radius: 14px !important; width: 130px; height: 130px; }
+
+  svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+  .conn {
+    stroke: #475569;
+    stroke-width: 2;
+    fill: none;
+    transition: stroke 0.4s, stroke-width 0.4s;
+  }
+  .conn.forward  { stroke: #22c55e; stroke-width: 4; }
+  .conn.backward { stroke: #ef4444; stroke-width: 4; }
+
+  .weight-badge {
+    position: absolute;
+    background: #facc15;
+    color: #422006;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 14px;
+    border: 2px solid #0f172a;
+    z-index: 4;
+    transition: all 0.4s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+    white-space: nowrap;
+    line-height: 1;
+    cursor: help;
+  }
+  .weight-badge.updated {
+    background: #fb923c;
+    border-color: #7c2d12;
+    transform: scale(1.3);
+  }
+  .weight-badge:hover { transform: scale(1.25); z-index: 20; box-shadow: 0 0 12px #fbbf24; }
+
+  .bias-badge {
+    position: absolute;
+    background: #f472b6;
+    color: #500724;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 2px solid #0f172a;
+    z-index: 4;
+    cursor: help;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+    white-space: nowrap;
+    line-height: 1;
+    transition: all 0.4s;
+  }
+  .bias-badge.updated { background: #fb923c; transform: scale(1.3); }
+  .bias-badge:hover { transform: scale(1.25); z-index: 20; }
+
+  #tooltip {
+    position: fixed;
+    background: #0f172a;
+    color: #fbbf24;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 2px solid #fbbf24;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.85);
+    line-height: 1.6;
+    text-align: left;
+    max-width: 460px;
+  }
+  #tooltip.show { opacity: 1; }
+  #tooltip .title { color: #7dd3fc; font-weight: bold; display: block; margin-bottom: 4px; font-size: 14px; }
+  #tooltip .terms { color: #e2e8f0; }
+  #tooltip .result { color: #22c55e; font-weight: bold; font-size: 15px; }
+  #tooltip .delta { color: #fb923c; font-weight: bold; }
+  #tooltip .note { color: #94a3b8; font-size: 11px; display: block; margin-top: 4px; }
+  #tooltip .arrow { color: #fb923c; }
+  #tooltip .fire { color: #22c55e; font-weight: bold; }
+  #tooltip .sleep { color: #94a3b8; font-weight: bold; }
+
+  .controls { margin-top: 15px; }
+  button.ctrl {
+    padding: 12px 22px;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    margin: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+  }
+  .btn-forward  { background: #22c55e; }
+  .btn-backward { background: #ef4444; }
+  .btn-reset    { background: #64748b; }
+  button.ctrl:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+  button.ctrl:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .epoca-badge {
+    display: inline-block;
+    background: #8b5cf6;
+    color: white;
+    font-weight: bold;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    margin-left: 10px;
+  }
+
+  .status {
+    margin-top: 15px;
+    font-size: 16px;
+    min-height: 30px;
+    color: #facc15;
+    font-weight: bold;
+  }
+
+  .panel {
+    max-width: 1100px;
+    margin: 15px auto;
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #cbd5e1;
+    text-align: left;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .panel h3 { margin: 0 0 6px 0; color: #38bdf8; font-size: 13px; }
+  .panel .col { background: #0f172a; padding: 10px; border-radius: 6px; line-height: 1.8; }
+  .panel .col b { color: #facc15; }
+  .panel .changed { color: #fb923c; font-weight: bold; }
+
+  .history {
+    max-width: 1100px;
+    margin: 15px auto;
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #cbd5e1;
+    text-align: left;
+  }
+  .history h3 { margin: 0 0 8px 0; color: #38bdf8; font-size: 13px; }
+  .history .row {
+    display: grid;
+    grid-template-columns: 80px 80px 90px 70px 70px 80px 80px;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    align-items: center;
+  }
+  .history .row.header {
+    color: #facc15;
+    font-weight: bold;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 4px;
+  }
+  .history .row.success { background: #14532d; border: 1px solid #22c55e; }
+  .history .row.fail    { background: #1e1b4b; }
+  .history .epoca { color: #7dd3fc; font-weight: bold; }
+  .history .err   { color: #fca5a5; }
+  .history .ok    { color: #86efac; }
+
+  .legend { margin-top: 10px; font-size: 13px; color: #94a3b8; }
+  .legend span { margin: 0 10px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align: middle;}
+  .dot-green { background:#22c55e; }
+  .dot-red   { background:#ef4444; }
+  .dot-yellow{ background:#facc15; }
+  .dot-purple{ background:#8b5cf6; }
+  .dot-pink  { background:#f472b6; }
+
+  .xor-table {
+    max-width: 1100px;
+    margin: 15px auto;
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #cbd5e1;
+  }
+  .xor-table h3 { margin: 0 0 8px 0; color: #38bdf8; font-size: 13px; }
+  .xor-table table { width: 100%; border-collapse: collapse; }
+  .xor-table th, .xor-table td {
+    padding: 5px 8px;
+    text-align: center;
+    border-bottom: 1px solid #334155;
+  }
+  .xor-table th { color: #facc15; }
+
+  .info-box {
+    max-width: 1100px;
+    margin: 15px auto;
+    background: #172554;
+    border-left: 4px solid #3b82f6;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #cbd5e1;
+    text-align: left;
+    line-height: 1.6;
+  }
+  .info-box b { color: #7dd3fc; }
+</style>
+</head>
+<body>
+
+<h1>🧠 La Rete Umana impara lo OR</h1>
+<p class="subtitle">Target: <b>X₁ OR X₂</b> → 0 solo se entrambi 0, altrimenti 1.</p>
+<p class="hint">💡 Scegli un pattern · Forward · Backprop · ripeti</p>
+
+<div class="info-box">
+  <b>💡 Curiosità:</b> a differenza dello XOR, l'OR è <b>linearmente separabile</b> — basta <b>un solo neurone</b> senza layer nascosto!
+</div>
+
+<div class="pattern-selector" id="patternSelector">
+  <button class="pattern-btn active" data-pattern="00">(0, 0) → 0</button>
+  <button class="pattern-btn" data-pattern="01">(0, 1) → 1</button>
+  <button class="pattern-btn" data-pattern="10">(1, 0) → 1</button>
+  <button class="pattern-btn" data-pattern="11">(1, 1) → 1</button>
+</div>
+
+<div class="stage" id="stage">
+  <div class="layer-label lbl-input">Input</div>
+  <div class="layer-label lbl-output">Output</div>
+  <div class="layer-label lbl-judge">Loss</div>
+
+  <svg id="svg"></svg>
+
+  <div class="node" id="i1"><span class="name">X₁</span><span class="sum">=0</span><span class="act"></span></div>
+  <div class="node" id="i2"><span class="name">X₂</span><span class="sum">=0</span><span class="act"></span></div>
+
+  <div class="node" id="o1"><span class="name">Uscita</span><span class="sum">Σ=?</span><span class="act"></span></div>
+
+  <div class="node judge-node" id="j"><span class="name">⚖️ Loss</span><span class="sum">err=?</span></div>
+</div>
+
+<div class="controls">
+  <button class="ctrl btn-forward" id="btnF">▶️ Forward Pass</button>
+  <button class="ctrl btn-backward" id="btnB" disabled>◀️ Backpropagation</button>
+  <button class="ctrl btn-reset" id="btnR">🔄 Reset</button>
+  <span class="epoca-badge" id="epocaBadge">Epoca 0</span>
+</div>
+
+<div class="status" id="status">Scegli un pattern e premi "▶️ Forward Pass"!</div>
+
+<div class="panel">
+  <h3>📋 Pesi e bias correnti</h3>
+  <div class="col" id="col-w"></div>
+</div>
+
+<div class="xor-table">
+  <h3>📊 Tabella OR — stato attuale della rete</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>X₁</th><th>X₂</th><th>Target</th>
+        <th>Σ out</th><th>Pred</th><th>Esito</th>
+      </tr>
+    </thead>
+    <tbody id="orTableBody"></tbody>
+  </table>
+</div>
+
+<div class="history">
+  <h3>📈 Storico epoche</h3>
+  <div id="history-rows">
+    <div class="row header">
+      <div>Epoca</div><div>Pattern</div><div>Σ out</div>
+      <div>Pred</div><div>Target</div><div>Errore</div><div>Esito</div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="dot dot-green"></span>Forward</span>
+  <span><span class="dot dot-red"></span>Backprop</span>
+  <span><span class="dot dot-yellow"></span>Peso</span>
+  <span><span class="dot dot-pink"></span>Bias</span>
+  <span><span class="dot dot-purple"></span>Epoca</span>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ================= POSIZIONI =================
+   Rete con 2 input → 1 output → judge. Nessun hidden!
+*/
+var NODE_POS = {
+  i1: { x: 220, y: 200 },
+  i2: { x: 220, y: 380 },
+  o1: { x: 720, y: 290 },
+  j:  { x: 970, y: 290 }
+};
+
+/* ================= PESI / BIAS =================
+   Inizializzati a valori piccoli: la rete deve IMPARARE.
+   I pesi partono a +0.3 e il bias a -0.4 → all'inizio sbaglia.
+*/
+var INITIAL_W = {
+  'i1->o1': 0.3,
+  'i2->o1': 0.3
+};
+var INITIAL_B = {
+  o1: -0.4
+};
+
+var W = Object.assign({}, INITIAL_W);
+var B = Object.assign({}, INITIAL_B);
+
+var lastUpdates = {};
+
+/* ================= PATTERN OR =================
+   Target: 0 solo se (0,0), altrimenti 1.
+*/
+var PATTERNS = {
+  '00': { i1: 0, i2: 0, target: 0 },
+  '01': { i1: 0, i2: 1, target: 1 },
+  '10': { i1: 1, i2: 0, target: 1 },
+  '11': { i1: 1, i2: 1, target: 1 }
+};
+var currentPatternKey = '00';
+
+var nodeOutputs = { i1: 0, i2: 0, o1: 0 };
+var nodeErrors = { o1: 0 };
+
+var epocaCount = 0;
+var isAnimating = false;
+
+var connections = [
+  { id:'i1-o1', from:'i1', to:'o1', key:'i1->o1' },
+  { id:'i2-o1', from:'i2', to:'o1', key:'i2->o1' },
+  { id:'o1-j',  from:'o1', to:'j',  key:'o1->j' }
+];
+
+/* ================= VALIDAZIONE PESI ================= */
+function ensureWeights() {
+  connections.forEach(function(c) {
+    if (c.key !== 'o1->j' && (typeof W[c.key] !== 'number' || isNaN(W[c.key]))) {
+      console.warn('Peso mancante per', c.key, '→ inizializzo a 0');
+      W[c.key] = 0;
+    }
+  });
+  if (typeof B.o1 !== 'number' || isNaN(B.o1)) {
+    console.warn('Bias mancante per o1 → inizializzo a 0');
+    B.o1 = 0;
+  }
+}
+
+/* ================= DOM ================= */
+var nodes = {};
+['i1','i2','o1','j'].forEach(function(id) {
+  nodes[id] = document.getElementById(id);
+});
+var svg = document.getElementById('svg');
+var stage = document.getElementById('stage');
+var statusEl = document.getElementById('status');
+var tooltipEl = document.getElementById('tooltip');
+var epocaBadge = document.getElementById('epocaBadge');
+
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+function relu(sum) { return sum > 0 ? sum : 0; }
+
+/* ================= fmtW BLINDATO ================= */
+function fmtW(v) {
+  if (typeof v !== 'number' || isNaN(v)) return '?';
+  return (v > 0 ? '+' : '') + v.toFixed(1).replace('.0', '');
+}
+
+/* ================= LAYOUT ================= */
+function layoutNodes() {
+  for (var id in NODE_POS) {
+    var p = NODE_POS[id];
+    var el = nodes[id];
+    var w = el.offsetWidth || 110;
+    var h = el.offsetHeight || 110;
+    el.style.left = (p.x - w/2) + 'px';
+    el.style.top  = (p.y - h/2) + 'px';
+  }
+}
+
+/* ================= BADGE anticollisione ================= */
+function computeBadgePositions() {
+  var placed = [];
+  var positions = {};
+  var byTarget = {};
+  connections.forEach(function(c) {
+    if (!byTarget[c.to]) byTarget[c.to] = [];
+    byTarget[c.to].push(c);
+  });
+
+  Object.keys(byTarget).forEach(function(target) {
+    var list = byTarget[target];
+    list.forEach(function(c, idx) {
+      var t = list.length === 1 ? 0.5 : 0.3 + (0.4 * idx / (list.length - 1));
+      var a = NODE_POS[c.from];
+      var b = NODE_POS[c.to];
+      var x = a.x + (b.x - a.x) * t;
+      var y = a.y + (b.y - a.y) * t;
+
+      // Le due linee i1→o1 e i2→o1 non si sovrappongono già: piccola curva per chiarezza
+      if (c.id === 'i1-o1') { y -= 20; }
+      if (c.id === 'i2-o1') { y += 20; }
+
+      placed.push({ x: x, y: y });
+      positions[c.id] = { x: x, y: y };
+    });
+  });
+  return positions;
+}
+
+/* ================= SVG ================= */
+function makePath(a, b, curveOffset) {
+  curveOffset = curveOffset || 0;
+  if (curveOffset === 0) return 'M ' + a.x + ' ' + a.y + ' L ' + b.x + ' ' + b.y;
+  var mx = (a.x + b.x) / 2;
+  var my = (a.y + b.y) / 2;
+  var len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  var px = -(b.y - a.y) / len;
+  var py = (b.x - a.x) / len;
+  return 'M ' + a.x + ' ' + a.y + ' Q ' + (mx + px*curveOffset) + ' ' + (my + py*curveOffset) + ' ' + b.x + ' ' + b.y;
+}
+
+function drawConnections() {
+  ensureWeights();
+
+  svg.innerHTML = '';
+  var oldBadges = document.querySelectorAll('.weight-badge, .bias-badge');
+  for (var i = 0; i < oldBadges.length; i++) oldBadges[i].remove();
+
+  // Piccola curva per distinguere le due linee input→output
+  var curveMap = { 'i1-o1': -35, 'i2-o1': 35 };
+
+  connections.forEach(function(c) {
+    var a = NODE_POS[c.from];
+    var b = NODE_POS[c.to];
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', makePath(a, b, curveMap[c.id] || 0));
+    path.setAttribute('class', 'conn');
+    path.setAttribute('id', 'line-' + c.id);
+    svg.appendChild(path);
+  });
+
+  var positions = computeBadgePositions();
+  connections.forEach(function(c) {
+    // Niente badge per o1→j: è solo il "confronto col target"
+    if (c.key === 'o1->j') return;
+
+    var p = positions[c.id];
+    var badge = document.createElement('div');
+    badge.className = 'weight-badge';
+    badge.id = 'badge-' + c.id;
+    badge.textContent = fmtW(W[c.key]);
+    badge.style.left = (p.x - 20) + 'px';
+    badge.style.top  = (p.y - 14) + 'px';
+    badge.addEventListener('mouseenter', function(e) { showWeightTooltip(c.key, e.clientX, e.clientY); });
+    badge.addEventListener('mousemove', function(e) {
+      if (tooltipEl.classList.contains('show')) showWeightTooltip(c.key, e.clientX, e.clientY);
+    });
+    badge.addEventListener('mouseleave', hideTooltip);
+    stage.appendChild(badge);
+  });
+
+  // Bias sotto il neurone di output
+  var pos = NODE_POS.o1;
+  var badge = document.createElement('div');
+  badge.className = 'bias-badge';
+  badge.id = 'bias-o1';
+  badge.textContent = 'b=' + fmtW(B.o1);
+  badge.style.left = (pos.x - 25) + 'px';
+  badge.style.top  = (pos.y + 65) + 'px';
+  badge.addEventListener('mouseenter', function(e) { showBiasTooltip('o1', e.clientX, e.clientY); });
+  badge.addEventListener('mousemove', function(e) {
+    if (tooltipEl.classList.contains('show')) showBiasTooltip('o1', e.clientX, e.clientY);
+  });
+  badge.addEventListener('mouseleave', hideTooltip);
+  stage.appendChild(badge);
+
+  updatePanel();
+}
+
+/* ================= PANNELLO ================= */
+function updatePanel() {
+  document.getElementById('col-w').innerHTML =
+    '<b>Pesi (Input → Output)</b><br>' +
+    'i1 → o1: <span' + (lastUpdates['i1->o1'] ? ' class="changed"' : '') + '>' + W['i1->o1'].toFixed(2) + '</span><br>' +
+    'i2 → o1: <span' + (lastUpdates['i2->o1'] ? ' class="changed"' : '') + '>' + W['i2->o1'].toFixed(2) + '</span><br>' +
+    'bias o1: <span' + (lastUpdates['bias:o1'] ? ' class="changed"' : '') + '>' + B.o1.toFixed(2) + '</span>';
+}
+
+/* ================= EVAL PATTERN ================= */
+function evalPattern(pat) {
+  ensureWeights();
+  var o_sum = pat.i1 * W['i1->o1'] + pat.i2 * W['i2->o1'] + B.o1;
+  var o = relu(o_sum);
+  var pred = o > 0 ? 1 : 0;
+  return { o_sum: o_sum, o: o, pred: pred };
+}
+
+function updateOrTable() {
+  var tbody = document.getElementById('orTableBody');
+  tbody.innerHTML = '';
+  ['00','01','10','11'].forEach(function(key) {
+    var pat = PATTERNS[key];
+    var r = evalPattern(pat);
+    var ok = r.pred === pat.target;
+    var row = document.createElement('tr');
+    row.innerHTML =
+      '<td>' + pat.i1 + '</td>' +
+      '<td>' + pat.i2 + '</td>' +
+      '<td>' + pat.target + '</td>' +
+      '<td>' + r.o_sum.toFixed(2) + '</td>' +
+      '<td><b>' + r.pred + '</b></td>' +
+      '<td style="color:' + (ok ? '#22c55e' : '#ef4444') + '">' + (ok ? '✅' : '❌') + '</td>';
+    tbody.appendChild(row);
+  });
+}
+
+/* ================= STORICO ================= */
+function addHistoryRow(epoca, patternKey, sumOut, pred, target, errore, success) {
+  var container = document.getElementById('history-rows');
+  var row = document.createElement('div');
+  row.className = 'row ' + (success ? 'success' : 'fail');
+  row.innerHTML =
+    '<div class="epoca">Epoca ' + epoca + '</div>' +
+    '<div>(' + patternKey[0] + ',' + patternKey[1] + ')</div>' +
+    '<div>' + sumOut.toFixed(2) + '</div>' +
+    '<div>' + pred + '</div>' +
+    '<div>' + target + '</div>' +
+    '<div class="err">' + (errore > 0 ? '+' : '') + errore.toFixed(2) + '</div>' +
+    '<div class="' + (success ? 'ok' : 'err') + '">' + (success ? '✅ OK' : '❌ err') + '</div>';
+  container.appendChild(row);
+  row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearHistory() {
+  var container = document.getElementById('history-rows');
+  container.innerHTML =
+    '<div class="row header">' +
+    '<div>Epoca</div><div>Pattern</div><div>Σ out</div>' +
+    '<div>Pred</div><div>Target</div><div>Errore</div><div>Esito</div>' +
+    '</div>';
+}
+
+/* ================= TOOLTIP NEURONI ================= */
+function buildNodeTooltip(nodeId) {
+  if (nodeId === 'i1' || nodeId === 'i2') {
+    var v = nodeOutputs[nodeId];
+    return '<span class="title">' + (nodeId === 'i1' ? 'X₁' : 'X₂') + ' (input)</span>' +
+           'Valore in ingresso: <span class="result">' + v + '</span>' +
+           '<span class="note">Nessuna sommatoria: è un input diretto.</span>';
+  }
+
+  if (nodeId === 'j') {
+    var target = PATTERNS[currentPatternKey].target;
+    var pred = nodeOutputs.o1 > 0 ? 1 : 0;
+    var err = target - pred;
+    return '<span class="title">⚖️ Loss (Judge)</span>' +
+           'Predizione: <b>' + pred + '</b><br>' +
+           'Target: <b>' + target + '</b><br>' +
+           'Errore (target − pred): <span class="result">' + (err > 0 ? '+' : '') + err.toFixed(2) + '</span>' +
+           '<span class="note">Errore ≠ 0 → serve backprop.</span>';
+  }
+
+  if (nodeId === 'o1') {
+    var w1 = (typeof W['i1->o1'] === 'number') ? W['i1->o1'] : 0;
+    var w2 = (typeof W['i2->o1'] === 'number') ? W['i2->o1'] : 0;
+    var b = (typeof B.o1 === 'number') ? B.o1 : 0;
+    var x1 = nodeOutputs.i1;
+    var x2 = nodeOutputs.i2;
+    var t1 = x1 * w1;
+    var t2 = x2 * w2;
+    var sum = t1 + t2 + b;
+    var out = relu(sum);
+    var target = PATTERNS[currentPatternKey].target;
+    var pred = sum > 0 ? 1 : 0;
+    var stato = sum > 0
+      ? '<span class="fire">⚡ uscita = ' + out.toFixed(2) + '</span>'
+      : '<span class="sleep">💤 = 0</span>';
+    var extra = '';
+    if (nodeErrors.o1 !== 0) {
+      extra = '<span class="note">Errore assegnato: <span class="delta">' +
+              nodeErrors.o1.toFixed(2) + '</span></span>';
+    }
+    return '<span class="title">Uscita (unico neurone!)</span>' +
+           'Σ = X₁·P₁ + X₂·P₂ + b<br>' +
+           '<span class="terms">   = (' + x1 + ' × ' + fmtW(w1) + ') + (' + x2 + ' × ' + fmtW(w2) + ') + (' + fmtW(b) + ')</span><br>' +
+           '<span class="terms">   = ' + t1.toFixed(2) + ' + ' + t2.toFixed(2) + ' + ' + b.toFixed(2) + '</span><br>' +
+           '<span class="result">Σ = ' + sum.toFixed(2) + '</span><br>' +
+           'Predizione: <b>' + pred + '</b> (target: ' + target + ')<br>' +
+           'Attivazione: ' + stato + extra +
+           '<span class="note">Se Σ &gt; 0 → classe 1, altrimenti classe 0.</span>';
+  }
+
+  return '';
+}
+
+/* ================= TOOLTIP PESI ================= */
+function buildWeightTooltip(key) {
+  var parts = key.split('->');
+  var from = parts[0];
+  var to = parts[1];
+  var w = (typeof W[key] === 'number') ? W[key] : 0;
+  var upd = lastUpdates[key];
+  var inputVal = nodeOutputs[from] || 0;
+
+  var html = '<span class="title">Peso ' + from + ' → ' + to + '</span>';
+  html += 'Contributo forward:<br>' +
+          '<span class="terms">   ' + from + ' × P = ' +
+          inputVal.toFixed(2) + ' × ' + fmtW(w) + ' = ' +
+          (inputVal * w).toFixed(2) + '</span><br>';
+
+  if (upd) {
+    html += '<br>🔄 Ultimo aggiornamento:<br>' +
+            '<span class="terms">   Nuovo = Vecchio + (Errore × 0.1)</span><br>' +
+            '<span class="terms">   = ' + fmtW(upd.old) + ' + (' +
+            fmtW(upd.err) + ' × 0.1)</span><br>' +
+            '<span class="result">' + fmtW(upd.old) + ' ' +
+            '<span class="arrow">→</span> ' + fmtW(upd.new) + '</span><br>' +
+            'Δ = <span class="delta">' +
+            (upd.delta > 0 ? '+' : '') + upd.delta.toFixed(2) + '</span>';
+  } else {
+    html += '<span class="note">Nessun aggiornamento ancora.</span>';
+  }
+
+  return html;
+}
+
+function buildBiasTooltip(nodeId) {
+  var b = (typeof B[nodeId] === 'number') ? B[nodeId] : 0;
+  var upd = lastUpdates['bias:' + nodeId];
+  var html = '<span class="title">Bias (soglia) di ' + nodeId.toUpperCase() + '</span>';
+  html += 'Sposta la soglia di attivazione del neurone.<br>' +
+          '<span class="terms">   Valore corrente: ' + fmtW(b) + '</span><br>' +
+          '<span class="note">Se Σ + b &gt; 0 → scatta.</span>';
+  if (upd) {
+    html += '<br>🔄 Aggiornamento:<br>' +
+            '<span class="result">' + fmtW(upd.old) + ' → ' + fmtW(upd.new) + '</span><br>' +
+            'Δ = <span class="delta">' +
+            (upd.delta > 0 ? '+' : '') + upd.delta.toFixed(2) + '</span>';
+  }
+  return html;
+}
+
+/* ================= TOOLTIP POSIZIONAMENTO ================= */
+function placeTooltip(mouseX, mouseY) {
+  var rect = tooltipEl.getBoundingClientRect();
+  var x = mouseX + 18;
+  var y = mouseY + 18;
+  if (x + rect.width > window.innerWidth - 10) x = mouseX - rect.width - 18;
+  if (y + rect.height > window.innerHeight - 10) y = mouseY - rect.height - 18;
+  if (x < 10) x = 10;
+  if (y < 10) y = 10;
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top  = y + 'px';
+}
+
+function showNodeTooltip(nodeId, mouseX, mouseY) {
+  var html = buildNodeTooltip(nodeId);
+  if (!html) return;
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  placeTooltip(mouseX, mouseY);
+}
+function showWeightTooltip(key, mouseX, mouseY) {
+  var html = buildWeightTooltip(key);
+  if (!html) return;
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  placeTooltip(mouseX, mouseY);
+}
+function showBiasTooltip(nodeId, mouseX, mouseY) {
+  var html = buildBiasTooltip(nodeId);
+  if (!html) return;
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  placeTooltip(mouseX, mouseY);
+}
+function hideTooltip() { tooltipEl.classList.remove('show'); }
+
+function attachNodeTooltipEvents() {
+  ['i1','i2','o1','j'].forEach(function(id) {
+    var el = nodes[id];
+    el.addEventListener('mouseenter', function(e) { showNodeTooltip(id, e.clientX, e.clientY); });
+    el.addEventListener('mousemove', function(e) {
+      if (tooltipEl.classList.contains('show')) showNodeTooltip(id, e.clientX, e.clientY);
+    });
+    el.addEventListener('mouseleave', hideTooltip);
+  });
+}
+
+/* ================= UI HELPERS ================= */
+function setSum(nodeId, text) {
+  var el = nodes[nodeId].querySelector('.sum');
+  if (el) el.textContent = text;
+}
+function setAct(nodeId, text) {
+  var el = nodes[nodeId].querySelector('.act');
+  if (el) el.textContent = text;
+}
+function updateEpocaBadge() {
+  epocaBadge.textContent = 'Epoca ' + epocaCount;
+}
+function clearVisualState() {
+  Object.keys(nodes).forEach(function(id) { nodes[id].classList.remove('active', 'error'); });
+  var conns = document.querySelectorAll('.conn');
+  for (var i = 0; i < conns.length; i++) conns[i].classList.remove('forward', 'backward');
+  var badges = document.querySelectorAll('.weight-badge, .bias-badge');
+  for (var j = 0; j < badges.length; j++) badges[j].classList.remove('updated');
+  setAct('o1', '');
+  setSum('j', 'err=?');
+}
+
+/* ================= PATTERN SELECTOR (delegation) ================= */
+function attachPatternListeners() {
+  var selector = document.getElementById('patternSelector');
+  selector.addEventListener('click', function(e) {
+    var btn = e.target.closest('.pattern-btn');
+    if (!btn) return;
+
+    if (isAnimating) {
+      statusEl.textContent = '⚠️ Attendi la fine dell\'animazione...';
+      return;
+    }
+
+    var allBtns = document.querySelectorAll('.pattern-btn');
+    for (var i = 0; i < allBtns.length; i++) allBtns[i].classList.remove('active');
+    btn.classList.add('active');
+    currentPatternKey = btn.dataset.pattern;
+    var pat = PATTERNS[currentPatternKey];
+
+    setSum('i1', '=' + pat.i1);
+    setSum('i2', '=' + pat.i2);
+    setAct('i1', ''); setAct('i2', '');
+    nodeOutputs.i1 = pat.i1;
+    nodeOutputs.i2 = pat.i2;
+
+    setSum('o1', 'Σ=?');
+    setAct('o1', '');
+    nodes.o1.classList.remove('active', 'error');
+    setSum('j', 'err=?');
+    nodes.j.classList.remove('active', 'error');
+
+    document.getElementById('btnF').disabled = false;
+    document.getElementById('btnB').disabled = true;
+
+    statusEl.textContent =
+      'Pattern (' + pat.i1 + ',' + pat.i2 + ') selezionato. Target = ' + pat.target +
+      '. Premi "▶️ Forward Pass".';
+  });
+}
+
+function refreshPatternButtons() {
+  var btns = document.querySelectorAll('.pattern-btn');
+  for (var i = 0; i < btns.length; i++) {
+    var key = btns[i].dataset.pattern;
+    var pat = PATTERNS[key];
+    var r = evalPattern(pat);
+    btns[i].classList.remove('correct', 'wrong');
+    if (r.pred === pat.target) btns[i].classList.add('correct');
+    else btns[i].classList.add('wrong');
+  }
+}
+
+/* ================= RESET ================= */
+function reset() {
+  W = Object.assign({}, INITIAL_W);
+  B = Object.assign({}, INITIAL_B);
+  lastUpdates = {};
+  nodeOutputs = { i1: PATTERNS[currentPatternKey].i1, i2: PATTERNS[currentPatternKey].i2, o1: 0 };
+  nodeErrors = { o1: 0 };
+  epocaCount = 0;
+  isAnimating = false;
+
+  clearVisualState();
+  setSum('i1', '=' + PATTERNS[currentPatternKey].i1);
+  setSum('i2', '=' + PATTERNS[currentPatternKey].i2);
+  setSum('o1', 'Σ=?');
+  setSum('j', 'err=?');
+
+  clearHistory();
+  drawConnections();
+  updateOrTable();
+  refreshPatternButtons();
+  updateEpocaBadge();
+
+  statusEl.textContent = 'Scegli un pattern e premi "▶️ Forward Pass"!';
+  document.getElementById('btnF').disabled = false;
+  document.getElementById('btnB').disabled = true;
+}
+
+/* ================= FORWARD PASS ================= */
+async function forwardPass() {
+  if (isAnimating) return;
+  isAnimating = true;
+
+  document.getElementById('btnF').disabled = true;
+  document.getElementById('btnB').disabled = true;
+  clearVisualState();
+
+  var pat = PATTERNS[currentPatternKey];
+
+  statusEl.textContent = '➡️ Forward Pass — pattern (' + pat.i1 + ',' + pat.i2 + ')';
+  await sleep(400);
+
+  // Input
+  nodeOutputs.i1 = pat.i1;
+  nodeOutputs.i2 = pat.i2;
+  nodes.i1.classList.add('active');
+  nodes.i2.classList.add('active');
+  setSum('i1', '=' + pat.i1);
+  setSum('i2', '=' + pat.i2);
+  setAct('i1', 'out=' + pat.i1);
+  setAct('i2', 'out=' + pat.i2);
+  await sleep(500);
+
+  // Output: unica sommatoria!
+  var c_i1o1 = connections.find(function(c){ return c.id === 'i1-o1'; });
+  var c_i2o1 = connections.find(function(c){ return c.id === 'i2-o1'; });
+  var o_sum = pat.i1 * W['i1->o1'] + pat.i2 * W['i2->o1'] + B.o1;
+  var o_out = relu(o_sum);
+
+  document.getElementById('line-' + c_i1o1.id).classList.add('forward');
+  document.getElementById('line-' + c_i2o1.id).classList.add('forward');
+  await sleep(300);
+
+  nodes.o1.classList.add('active');
+  setSum('o1', 'Σ=' + o_sum.toFixed(2));
+  setAct('o1', o_sum > 0 ? '⚡ ' + o_out.toFixed(2) : '💤 0');
+  nodeOutputs.o1 = o_out;
+  await sleep(600);
+
+  // Judge
+  document.getElementById('line-o1-j').classList.add('forward');
+  nodes.j.classList.add('active');
+  var pred = o_sum > 0 ? 1 : 0;
+  var err = pat.target - pred;
+  setSum('j', err === 0 ? 'err=0' : 'err=' + (err > 0 ? '+' : '') + err);
+  await sleep(400);
+
+  // Storico
+  epocaCount++;
+  var success = (pred === pat.target);
+  addHistoryRow(epocaCount, currentPatternKey, o_sum, pred, pat.target, err, success);
+  updateEpocaBadge();
+  updateOrTable();
+  refreshPatternButtons();
+
+  isAnimating = false;
+
+  if (success) {
+    var allOk = ['00','01','10','11'].every(function(k) {
+      var p = PATTERNS[k];
+      var r = evalPattern(p);
+      return r.pred === p.target;
+    });
+    if (allOk) {
+      statusEl.textContent = '🎉 Epoca ' + epocaCount + ' — Corretto! E la rete ora indovina TUTTI e 4 i pattern OR!';
+      document.getElementById('btnF').disabled = true;
+      document.getElementById('btnB').disabled = true;
+    } else {
+      statusEl.textContent = '✅ Epoca ' + epocaCount + ' — Corretto! Puoi cambiare pattern o fare Backprop.';
+      document.getElementById('btnF').disabled = false;
+      document.getElementById('btnB').disabled = false;
+    }
+  } else {
+    statusEl.textContent = '❌ Epoca ' + epocaCount + ' — pred=' + pred + ', target=' + pat.target +
+      '. Premi "◀️ Backpropagation" oppure cambia pattern.';
+    document.getElementById('btnF').disabled = false;
+    document.getElementById('btnB').disabled = false;
+  }
+}
+
+/* ================= BACKPROP =================
+   Con un solo neurone la formula è semplicissima:
+   NuovoPeso = VecchioPeso + Errore × LearningRate × Input
+*/
+async function backwardPass() {
+  if (isAnimating) return;
+  isAnimating = true;
+
+  document.getElementById('btnF').disabled = true;
+  document.getElementById('btnB').disabled = true;
+
+  statusEl.textContent = '⬅️ Backpropagation — la colpa torna indietro';
+  await sleep(400);
+
+  var pat = PATTERNS[currentPatternKey];
+
+  var o_sum = pat.i1 * W['i1->o1'] + pat.i2 * W['i2->o1'] + B.o1;
+  var pred = o_sum > 0 ? 1 : 0;
+  var err = pat.target - pred;
+
+  // Judge
+  nodes.j.classList.remove('active');
+  nodes.j.classList.add('error');
+  setSum('j', 'err=' + (err > 0 ? '+' : '') + err);
+  await sleep(700);
+
+  // Output: errore assegnato
+  nodeErrors.o1 = err;
+  document.getElementById('line-o1-j').classList.remove('forward');
+  document.getElementById('line-o1-j').classList.add('backward');
+  nodes.o1.classList.remove('active');
+  nodes.o1.classList.add('error');
+  setAct('o1', 'err=' + (err > 0 ? '+' : '') + err);
+  await sleep(800);
+
+  // Input: torna l'errore
+  ['i1-o1','i2-o1'].forEach(function(id) {
+    var l = document.getElementById('line-' + id);
+    l.classList.remove('forward');
+    l.classList.add('backward');
+  });
+  ['i1','i2'].forEach(function(i) {
+    nodes[i].classList.remove('active');
+    nodes[i].classList.add('error');
+  });
+  await sleep(800);
+
+  // Aggiornamento
+  statusEl.textContent = '🔧 Aggiornamento: Nuovo = Vecchio + (Errore × 0.1 × Input)';
+  await sleep(400);
+
+  var lr = 0.1;
+  updateWeight('i1->o1', err, lr, pat.i1); await sleep(300);
+  updateWeight('i2->o1', err, lr, pat.i2); await sleep(300);
+  updateBias('o1', err, lr); await sleep(300);
+
+  updatePanel();
+  updateOrTable();
+  refreshPatternButtons();
+
+  statusEl.textContent = '✅ Pesi e bias aggiornati! Scegli un pattern e premi "▶️ Forward Pass".';
+  document.getElementById('btnF').disabled = false;
+  document.getElementById('btnB').disabled = true;
+  isAnimating = false;
+}
+
+/* updateWeight con input incluso: delta = err × lr × input
+   (questa è la regola vera del perceptron!)
+*/
+function updateWeight(key, error, lr, inputVal) {
+  var oldW = (typeof W[key] === 'number') ? W[key] : 0;
+  var delta = error * lr * (inputVal || 0);
+  var newW = +(oldW + delta).toFixed(2);
+  lastUpdates[key] = { old: oldW, delta: delta, new: newW, err: error };
+  W[key] = newW;
+  var c = connections.find(function(x) { return x.key === key; });
+  if (!c) return;
+  var badge = document.getElementById('badge-' + c.id);
+  if (badge) {
+    badge.textContent = fmtW(newW);
+    badge.classList.add('updated');
+  }
+}
+
+function updateBias(nodeId, error, lr) {
+  var oldB = (typeof B[nodeId] === 'number') ? B[nodeId] : 0;
+  var delta = error * lr;
+  var newB = +(oldB + delta).toFixed(2);
+  lastUpdates['bias:' + nodeId] = { old: oldB, delta: delta, new: newB, err: error };
+  B[nodeId] = newB;
+  var badge = document.getElementById('bias-' + nodeId);
+  if (badge) {
+    badge.textContent = 'b=' + fmtW(newB);
+    badge.classList.add('updated');
+  }
+}
+
+/* ================= INIT ================= */
+window.addEventListener('load', function() {
+  ensureWeights();
+  layoutNodes();
+  drawConnections();
+  attachNodeTooltipEvents();
+  attachPatternListeners();
+  document.getElementById('btnF').addEventListener('click', forwardPass);
+  document.getElementById('btnB').addEventListener('click', backwardPass);
+  document.getElementById('btnR').addEventListener('click', reset);
+  reset();
+  console.log('=== OR pronto ===');
+});
+</script>
+</body>
+</html>

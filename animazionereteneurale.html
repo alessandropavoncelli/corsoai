@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>La Rete Umana Indovina-Immagini</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #fff;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { color: #38bdf8; margin-bottom: 5px; }
+  .subtitle { color: #94a3b8; margin-top: 0; font-size: 14px; }
+  .hint { color: #7dd3fc; font-style: italic; font-size: 13px; }
+
+  .stage {
+    position: relative;
+    height: 660px;
+    max-width: 1300px;
+    margin: 20px auto;
+    background: #1e293b;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .layer-label {
+    position: absolute;
+    top: 15px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .lbl-input  { left: 6%; }
+  .lbl-hidden { left: 32%; }
+  .lbl-output { left: 58%; }
+  .lbl-judge  { left: 84%; }
+
+  .node {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #334155;
+    border: 3px solid #64748b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    transition: all 0.3s;
+    z-index: 3;
+    line-height: 1.15;
+    cursor: help;
+    user-select: none;
+  }
+  .node .name { font-size: 12px; }
+  .node .sum {
+    font-size: 15px;
+    color: #fbbf24;
+    margin-top: 2px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+  }
+  .node .act {
+    font-size: 10px;
+    color: #cbd5e1;
+    margin-top: 1px;
+    font-family: 'Courier New', monospace;
+  }
+  .node.active {
+    background: #22c55e;
+    border-color: #4ade80;
+    box-shadow: 0 0 22px #22c55e;
+  }
+  .node.active .sum { color: #052e16; }
+  .node.active .act { color: #052e16; }
+  .node.error {
+    background: #ef4444;
+    border-color: #f87171;
+    box-shadow: 0 0 22px #ef4444;
+  }
+  .node.error .sum { color: #450a0a; }
+  .node.error .act { color: #450a0a; }
+  .node:hover {
+    transform: scale(1.08);
+    filter: brightness(1.2);
+    z-index: 10;
+  }
+
+  .judge-node {
+    border-radius: 12px !important;
+    width: 120px;
+    height: 120px;
+  }
+
+  svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+  .conn {
+    stroke: #475569;
+    stroke-width: 2;
+    fill: none;
+    transition: stroke 0.4s, stroke-width 0.4s;
+  }
+  .conn.forward  { stroke: #22c55e; stroke-width: 4; }
+  .conn.backward { stroke: #ef4444; stroke-width: 4; }
+
+  .weight-badge {
+    position: absolute;
+    background: #facc15;
+    color: #422006;
+    font-weight: bold;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 12px;
+    border: 2px solid #0f172a;
+    z-index: 4;
+    transition: all 0.4s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+    white-space: nowrap;
+    line-height: 1;
+    cursor: help;
+  }
+  .weight-badge.updated {
+    background: #fb923c;
+    border-color: #7c2d12;
+    transform: scale(1.3);
+  }
+  .weight-badge:hover {
+    transform: scale(1.25);
+    z-index: 20;
+    box-shadow: 0 0 12px #fbbf24;
+  }
+
+  #tooltip {
+    position: fixed;
+    background: #0f172a;
+    color: #fbbf24;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 2px solid #fbbf24;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.85);
+    line-height: 1.6;
+    text-align: left;
+    max-width: 420px;
+  }
+  #tooltip.show { opacity: 1; }
+  #tooltip .title { color: #7dd3fc; font-weight: bold; display: block; margin-bottom: 4px; font-size: 14px; }
+  #tooltip .terms { color: #e2e8f0; }
+  #tooltip .result { color: #22c55e; font-weight: bold; font-size: 15px; }
+  #tooltip .delta { color: #fb923c; font-weight: bold; }
+  #tooltip .note { color: #94a3b8; font-size: 11px; display: block; margin-top: 4px; }
+  #tooltip .arrow { color: #fb923c; }
+  #tooltip .fire { color: #22c55e; font-weight: bold; }
+  #tooltip .sleep { color: #94a3b8; font-weight: bold; }
+
+  .controls { margin-top: 15px; }
+  button {
+    padding: 12px 22px;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    margin: 5px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .btn-forward  { background: #22c55e; color: white; }
+  .btn-backward { background: #ef4444; color: white; }
+  .btn-reset    { background: #64748b; color: white; }
+  button:hover { opacity: 0.85; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .epoca-badge {
+    display: inline-block;
+    background: #8b5cf6;
+    color: white;
+    font-weight: bold;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    margin-left: 10px;
+  }
+
+  .status {
+    margin-top: 15px;
+    font-size: 16px;
+    min-height: 30px;
+    color: #facc15;
+    font-weight: bold;
+  }
+
+  .panel {
+    max-width: 1300px;
+    margin: 15px auto;
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #cbd5e1;
+    text-align: left;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+  .panel h3 {
+    margin: 0 0 6px 0;
+    color: #38bdf8;
+    font-size: 13px;
+    grid-column: 1 / -1;
+  }
+  .panel .col { background: #0f172a; padding: 8px; border-radius: 6px; line-height: 1.6; }
+  .panel .col b { color: #facc15; }
+  .panel .changed { color: #fb923c; font-weight: bold; }
+
+  .history {
+    max-width: 1300px;
+    margin: 15px auto;
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #cbd5e1;
+    text-align: left;
+  }
+  .history h3 {
+    margin: 0 0 8px 0;
+    color: #38bdf8;
+    font-size: 13px;
+  }
+  .history .row {
+    display: grid;
+    grid-template-columns: 90px 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    align-items: center;
+  }
+  .history .row.header {
+    color: #facc15;
+    font-weight: bold;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 4px;
+  }
+  .history .row.success {
+    background: #14532d;
+    border: 1px solid #22c55e;
+  }
+  .history .row.fail {
+    background: #1e1b4b;
+  }
+  .history .epoca { color: #7dd3fc; font-weight: bold; }
+  .history .cane { color: #fca5a5; }
+  .history .gatto { color: #86efac; }
+  .history .esito.ok { color: #22c55e; font-weight: bold; }
+  .history .esito.no { color: #ef4444; font-weight: bold; }
+
+  .legend {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  .legend span { margin: 0 10px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align: middle;}
+  .dot-green { background:#22c55e; }
+  .dot-red   { background:#ef4444; }
+  .dot-yellow{ background:#facc15; }
+  .dot-purple{ background:#8b5cf6; }
+</style>
+</head>
+<body>
+
+<h1>🧠 La Rete Umana Indovina-Immagini</h1>
+<p class="subtitle">Input: <b>🐱 GATTO</b> (X₁=1, X₂=0) → Target corretto: <b>Gatto</b></p>
+<p class="hint">💡 Passa il mouse su un neurone o su un peso giallo · Ogni Forward Pass è una nuova epoca</p>
+
+<div class="stage" id="stage">
+  <div class="layer-label lbl-input">Input</div>
+  <div class="layer-label lbl-hidden">Hidden</div>
+  <div class="layer-label lbl-output">Output</div>
+  <div class="layer-label lbl-judge">Loss</div>
+
+  <svg id="svg"></svg>
+
+  <div class="node" id="i1"><span class="name">X₁</span><span class="sum">=1</span></div>
+  <div class="node" id="i2"><span class="name">X₂</span><span class="sum">=0</span></div>
+
+  <div class="node" id="h1"><span class="name">H₁</span><span class="sum">Σ=?</span><span class="act"></span></div>
+  <div class="node" id="h2"><span class="name">H₂</span><span class="sum">Σ=?</span><span class="act"></span></div>
+  <div class="node" id="h3"><span class="name">H₃</span><span class="sum">Σ=?</span><span class="act"></span></div>
+
+  <div class="node" id="o1"><span class="name">🐶 Cane</span><span class="sum">Σ=?</span><span class="act"></span></div>
+  <div class="node" id="o2"><span class="name">🐱 Gatto</span><span class="sum">Σ=?</span><span class="act"></span></div>
+
+  <div class="node judge-node" id="j"><span class="name">⚖️ Loss</span><span class="sum">err=?</span></div>
+</div>
+
+<div class="controls">
+  <button class="btn-forward" id="btnF" onclick="forwardPass()">▶️ Forward Pass (nuova epoca)</button>
+  <button class="btn-backward" id="btnB" onclick="backwardPass()" disabled>◀️ Backpropagation</button>
+  <button class="btn-reset" onclick="reset()">🔄 Reset</button>
+  <span class="epoca-badge" id="epocaBadge">Epoca 0</span>
+</div>
+
+<div class="status" id="status">Premi "▶️ Forward Pass" per iniziare la prima epoca!</div>
+
+<div class="panel">
+  <h3>📋 Pesi correnti (verifica manuale)</h3>
+  <div class="col" id="col-ih"></div>
+  <div class="col" id="col-ho"></div>
+  <div class="col" id="col-oj"></div>
+</div>
+
+<div class="history">
+  <h3>📊 Storico epoche (Σ Cane vs Σ Gatto)</h3>
+  <div id="history-rows">
+    <div class="row header">
+      <div>Epoca</div>
+      <div>Σ 🐶 Cane</div>
+      <div>Σ 🐱 Gatto</div>
+      <div>Chi vince</div>
+      <div>Esito</div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="dot dot-green"></span>Dati in avanti</span>
+  <span><span class="dot dot-red"></span>Errore all'indietro</span>
+  <span><span class="dot dot-yellow"></span>Peso (passa il mouse!)</span>
+  <span><span class="dot dot-purple"></span>Epoca corrente</span>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+/* ================= POSIZIONI ================= */
+const NODE_POS = {
+  i1: { x: 110, y: 180 },
+  i2: { x: 110, y: 460 },
+  h1: { x: 460, y: 140 },
+  h2: { x: 460, y: 320 },
+  h3: { x: 460, y: 500 },
+  o1: { x: 830, y: 220 },
+  o2: { x: 830, y: 420 },
+  j:  { x: 1100, y: 320 }
+};
+
+/* ================= PESI ================= */
+let W = {
+  'i1->h1': 2,  'i2->h1': 1,
+  'i1->h2': -1, 'i2->h2': 2,
+  'i1->h3': 1,  'i2->h3': -1,
+  'h1->o1': 2,  'h2->o1': 1,  'h3->o1': -1,
+  'h1->o2': -1, 'h2->o2': 2,  'h3->o2': 1,
+  'o1->j': 1,   'o2->j': 1
+};
+const INITIAL_W = Object.assign({}, W);
+
+let lastUpdates = {};
+let inputs = { i1: 1, i2: 0 };
+let nodeOutputs = { i1: 1, i2: 0, h1: 0, h2: 0, h3: 0, o1: 0, o2: 0 };
+let nodeErrors = { o1: 0, o2: 0, h1: 0, h2: 0, h3: 0 };
+
+// Stato epoche
+let epocaCount = 0;          // epoche già concluse (con successo o meno)
+let epocaInCorso = false;    // true dopo un Forward, false dopo Backprop
+let successoRaggiunto = false;
+let ultimoForward = null;    // {sumCane, sumGatto, success}
+
+const connections = [
+  { id:'i1-h1', from:'i1', to:'h1', key:'i1->h1' },
+  { id:'i1-h2', from:'i1', to:'h2', key:'i1->h2' },
+  { id:'i1-h3', from:'i1', to:'h3', key:'i1->h3' },
+  { id:'i2-h1', from:'i2', to:'h1', key:'i2->h1' },
+  { id:'i2-h2', from:'i2', to:'h2', key:'i2->h2' },
+  { id:'i2-h3', from:'i2', to:'h3', key:'i2->h3' },
+  { id:'h1-o1', from:'h1', to:'o1', key:'h1->o1' },
+  { id:'h1-o2', from:'h1', to:'o2', key:'h1->o2' },
+  { id:'h2-o1', from:'h2', to:'o1', key:'h2->o1' },
+  { id:'h2-o2', from:'h2', to:'o2', key:'h2->o2' },
+  { id:'h3-o1', from:'h3', to:'o1', key:'h3->o1' },
+  { id:'h3-o2', from:'h3', to:'o2', key:'h3->o2' },
+  { id:'o1-j',  from:'o1', to:'j',  key:'o1->j' },
+  { id:'o2-j',  from:'o2', to:'j',  key:'o2->j' }
+];
+
+const nodes = {};
+['i1','i2','h1','h2','h3','o1','o2','j'].forEach(id => {
+  nodes[id] = document.getElementById(id);
+});
+const svg = document.getElementById('svg');
+const stage = document.getElementById('stage');
+const statusEl = document.getElementById('status');
+const tooltipEl = document.getElementById('tooltip');
+const epocaBadge = document.getElementById('epocaBadge');
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ================= ReLU ================= */
+function relu(sum) {
+  return sum > 0 ? sum : 0;
+}
+
+/* ================= LAYOUT ================= */
+function layoutNodes() {
+  for (const id in NODE_POS) {
+    const p = NODE_POS[id];
+    const el = nodes[id];
+    const w = el.offsetWidth || 100;
+    const h = el.offsetHeight || 100;
+    el.style.left = (p.x - w/2) + 'px';
+    el.style.top  = (p.y - h/2) + 'px';
+  }
+}
+
+/* ================= BADGE anticollisione ================= */
+function computeBadgePositions() {
+  const placed = [];
+  const positions = {};
+  const byTarget = {};
+  connections.forEach(c => {
+    if (!byTarget[c.to]) byTarget[c.to] = [];
+    byTarget[c.to].push(c);
+  });
+
+  Object.keys(byTarget).forEach(target => {
+    const list = byTarget[target];
+    list.forEach((c, idx) => {
+      const t = list.length === 1 ? 0.5 : 0.32 + (0.36 * idx / (list.length - 1));
+      const a = NODE_POS[c.from];
+      const b = NODE_POS[c.to];
+      let x = a.x + (b.x - a.x) * t;
+      let y = a.y + (b.y - a.y) * t;
+
+      for (let attempt = 0; attempt < 40; attempt++) {
+        let ok = true;
+        for (let i = 0; i < placed.length; i++) {
+          if (Math.hypot(placed[i].x - x, placed[i].y - y) < 38) { ok = false; break; }
+        }
+        if (ok) break;
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const px = -(b.y - a.y) / len;
+        const py = (b.x - a.x) / len;
+        const dir = attempt % 2 === 0 ? 1 : -1;
+        const step = 10 + attempt * 2;
+        x += px * step * dir;
+        y += py * step * dir;
+      }
+      placed.push({ x: x, y: y });
+      positions[c.id] = { x: x, y: y };
+    });
+  });
+  return positions;
+}
+
+/* ================= SVG ================= */
+function makePath(a, b, curveOffset) {
+  curveOffset = curveOffset || 0;
+  if (curveOffset === 0) return 'M ' + a.x + ' ' + a.y + ' L ' + b.x + ' ' + b.y;
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const px = -(b.y - a.y) / len;
+  const py = (b.x - a.x) / len;
+  return 'M ' + a.x + ' ' + a.y + ' Q ' + (mx + px*curveOffset) + ' ' + (my + py*curveOffset) + ' ' + b.x + ' ' + b.y;
+}
+
+function drawConnections() {
+  svg.innerHTML = '';
+  document.querySelectorAll('.weight-badge').forEach(el => el.remove());
+
+  const curveMap = {
+    'i1-h2': -25, 'i1-h3': -25,
+    'i2-h1': 25,  'i2-h2': 25,
+    'h1-o2': -30, 'h2-o1': -25, 'h2-o2': 25, 'h3-o1': 25
+  };
+
+  connections.forEach(c => {
+    const a = NODE_POS[c.from];
+    const b = NODE_POS[c.to];
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', makePath(a, b, curveMap[c.id] || 0));
+    path.setAttribute('class', 'conn');
+    path.setAttribute('id', 'line-' + c.id);
+    svg.appendChild(path);
+  });
+
+  const positions = computeBadgePositions();
+  connections.forEach(c => {
+    const p = positions[c.id];
+    const badge = document.createElement('div');
+    badge.className = 'weight-badge';
+    badge.id = 'badge-' + c.id;
+    badge.textContent = fmtW(W[c.key]);
+    badge.style.left = (p.x - 16) + 'px';
+    badge.style.top  = (p.y - 10) + 'px';
+    badge.addEventListener('mouseenter', e => showWeightTooltip(c.key, e.clientX, e.clientY));
+    badge.addEventListener('mousemove',  e => {
+      if (tooltipEl.classList.contains('show')) showWeightTooltip(c.key, e.clientX, e.clientY);
+    });
+    badge.addEventListener('mouseleave', hideTooltip);
+    stage.appendChild(badge);
+  });
+
+  updatePanel();
+}
+
+function fmtW(v) {
+  return (v > 0 ? '+' : '') + v.toFixed(1).replace('.0', '');
+}
+
+/* ================= PANNELLO ================= */
+function updatePanel() {
+  document.getElementById('col-ih').innerHTML = buildPanelCol('Input → Hidden', [
+    ['i1→h1', 'i1->h1'], ['i2→h1', 'i2->h1'],
+    ['i1→h2', 'i1->h2'], ['i2→h2', 'i2->h2'],
+    ['i1→h3', 'i1->h3'], ['i2→h3', 'i2->h3']
+  ]);
+  document.getElementById('col-ho').innerHTML = buildPanelCol('Hidden → Output', [
+    ['h1→o1', 'h1->o1'], ['h2→o1', 'h2->o1'], ['h3→o1', 'h3->o1'],
+    ['h1→o2', 'h1->o2'], ['h2→o2', 'h2->o2'], ['h3→o2', 'h3->o2']
+  ]);
+  document.getElementById('col-oj').innerHTML = buildPanelCol('Output → Judge', [
+    ['o1→j', 'o1->j'], ['o2→j', 'o2->j']
+  ]);
+}
+
+function buildPanelCol(title, items) {
+  let html = '<b>' + title + '</b><br>';
+  items.forEach(([label, key]) => {
+    const v = W[key].toFixed(1);
+    const changed = lastUpdates[key] ? ' class="changed"' : '';
+    html += label + ': <span' + changed + '>' + v + '</span><br>';
+  });
+  return html;
+}
+
+/* ================= STORICO ================= */
+function addHistoryRow(epoca, sumCane, sumGatto, success) {
+  const container = document.getElementById('history-rows');
+  const row = document.createElement('div');
+  row.className = 'row ' + (success ? 'success' : 'fail');
+  const winner = sumCane > sumGatto ? '🐶 Cane' : '🐱 Gatto';
+  const esito = success ? '✅ OK' : '❌ err';
+  row.innerHTML =
+    '<div class="epoca">Epoca ' + epoca + '</div>' +
+    '<div class="cane">' + sumCane.toFixed(1) + '</div>' +
+    '<div class="gatto">' + sumGatto.toFixed(1) + '</div>' +
+    '<div>' + winner + '</div>' +
+    '<div class="esito ' + (success ? 'ok' : 'no') + '">' + esito + '</div>';
+  container.appendChild(row);
+  row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearHistory() {
+  const container = document.getElementById('history-rows');
+  container.innerHTML =
+    '<div class="row header">' +
+    '<div>Epoca</div>' +
+    '<div>Σ 🐶 Cane</div>' +
+    '<div>Σ 🐱 Gatto</div>' +
+    '<div>Chi vince</div>' +
+    '<div>Esito</div>' +
+    '</div>';
+}
+
+/* ================= TOOLTIP NEURONI ================= */
+function buildNodeTooltip(nodeId) {
+  if (nodeId === 'i1' || nodeId === 'i2') {
+    const v = inputs[nodeId];
+    return '<span class="title">' + (nodeId === 'i1' ? 'X₁' : 'X₂') + ' (input)</span>' +
+           'Valore in ingresso: <span class="result">' + v + '</span>' +
+           '<span class="note">Nessuna sommatoria: è un input diretto.</span>';
+  }
+
+  if (nodeId === 'j') {
+    const pred = nodeOutputs.o1 > nodeOutputs.o2 ? 'CANE' : 'GATTO';
+    const err = pred === 'GATTO' ? '0' : '+3';
+    return '<span class="title">⚖️ Loss (Judge)</span>' +
+           'Uscita Cane: <b>' + nodeOutputs.o1.toFixed(1) + '</b><br>' +
+           'Uscita Gatto: <b>' + nodeOutputs.o2.toFixed(1) + '</b><br>' +
+           'Target: <b>GATTO</b><br>' +
+           'Errore: <span class="result">' + err + '</span>' +
+           '<span class="note">Confronta la previsione col target.</span>';
+  }
+
+  if (nodeId === 'h1' || nodeId === 'h2' || nodeId === 'h3') {
+    const w1 = W['i1->' + nodeId];
+    const w2 = W['i2->' + nodeId];
+    const x1 = nodeOutputs.i1;
+    const x2 = nodeOutputs.i2;
+    const t1 = x1 * w1;
+    const t2 = x2 * w2;
+    const sum = t1 + t2;
+    const out = relu(sum);
+    const stato = sum > 0
+      ? '<span class="fire">⚡ scatta → uscita = ' + out.toFixed(1) + '</span>'
+      : '<span class="sleep">💤 resta 0</span>';
+    let extra = '';
+    if (nodeErrors[nodeId] !== 0) {
+      extra = '<span class="note">Errore ricevuto: <span class="delta">' +
+              nodeErrors[nodeId].toFixed(2) + '</span></span>';
+    }
+    return '<span class="title">' + nodeId.toUpperCase() + '</span>' +
+           'Σ = (X₁ × P₁) + (X₂ × P₂)<br>' +
+           '<span class="terms">   = (' + x1 + ' × ' + fmtW(w1) + ') + (' + x2 + ' × ' + fmtW(w2) + ')</span><br>' +
+           '<span class="terms">   = ' + t1.toFixed(1) + ' + ' + t2.toFixed(1) + '</span><br>' +
+           '<span class="result">Σ = ' + sum.toFixed(1) + '</span><br>' +
+           'Attivazione: ' + stato + extra +
+           '<span class="note">Se Σ &gt; 0 scatta, altrimenti resta 0.</span>';
+  }
+
+  if (nodeId === 'o1' || nodeId === 'o2') {
+    const w1 = W['h1->' + nodeId];
+    const w2 = W['h2->' + nodeId];
+    const w3 = W['h3->' + nodeId];
+    const h1 = nodeOutputs.h1;
+    const h2 = nodeOutputs.h2;
+    const h3 = nodeOutputs.h3;
+    const t1 = h1 * w1;
+    const t2 = h2 * w2;
+    const t3 = h3 * w3;
+    const sum = t1 + t2 + t3;
+    const out = relu(sum);
+    const label = nodeId === 'o1' ? '🐶 Cane' : '🐱 Gatto';
+    const stato = sum > 0
+      ? '<span class="fire">⚡ punteggio = ' + out.toFixed(1) + '</span>'
+      : '<span class="sleep">💤 = 0</span>';
+    let extra = '';
+    if (nodeErrors[nodeId] !== 0) {
+      extra = '<span class="note">Errore assegnato: <span class="delta">' +
+              nodeErrors[nodeId].toFixed(2) + '</span></span>';
+    }
+    return '<span class="title">' + label + '</span>' +
+           'Σ = (H₁ × P₁) + (H₂ × P₂) + (H₃ × P₃)<br>' +
+           '<span class="terms">   = (' + h1.toFixed(1) + ' × ' + fmtW(w1) + ') + (' + h2.toFixed(1) + ' × ' + fmtW(w2) + ') + (' + h3.toFixed(1) + ' × ' + fmtW(w3) + ')</span><br>' +
+           '<span class="terms">   = ' + t1.toFixed(1) + ' + ' + t2.toFixed(1) + ' + ' + t3.toFixed(1) + '</span><br>' +
+           '<span class="result">Σ = ' + sum.toFixed(1) + '</span><br>' +
+           'Attivazione: ' + stato + extra +
+           '<span class="note">Confronta Cane vs Gatto: vince la Σ più alta.</span>';
+  }
+
+  return '';
+}
+
+/* ================= TOOLTIP PESI ================= */
+function buildWeightTooltip(key) {
+  const parts = key.split('->');
+  const from = parts[0];
+  const to = parts[1];
+  const w = W[key];
+  const upd = lastUpdates[key];
+  const inputVal = nodeOutputs[from] || 0;
+
+  let html = '<span class="title">Peso ' + from + ' → ' + to + '</span>';
+  html += 'Contributo forward:<br>' +
+          '<span class="terms">   ' + from + ' × P = ' +
+          inputVal.toFixed(1) + ' × ' + fmtW(w) + ' = ' +
+          (inputVal * w).toFixed(1) + '</span><br>';
+
+  if (upd) {
+    html += '<br>🔄 Ultimo aggiornamento:<br>' +
+            '<span class="terms">   Nuovo = Vecchio + (Errore × 0.1)</span><br>' +
+            '<span class="terms">   = ' + fmtW(upd.old) + ' + (' +
+            fmtW(upd.err) + ' × 0.1)</span><br>' +
+            '<span class="result">' + fmtW(upd.old) + ' ' +
+            '<span class="arrow">→</span> ' + fmtW(upd.new) + '</span><br>' +
+            'Δ = <span class="delta">' +
+            (upd.delta > 0 ? '+' : '') + upd.delta.toFixed(2) + '</span>';
+  } else {
+    html += '<span class="note">Nessun aggiornamento ancora. Il peso cambierà dopo la Backpropagation.</span>';
+  }
+
+  return html;
+}
+
+/* ================= GESTIONE TOOLTIP ================= */
+function placeTooltip(mouseX, mouseY) {
+  const rect = tooltipEl.getBoundingClientRect();
+  let x = mouseX + 18;
+  let y = mouseY + 18;
+  if (x + rect.width > window.innerWidth - 10) x = mouseX - rect.width - 18;
+  if (y + rect.height > window.innerHeight - 10) y = mouseY - rect.height - 18;
+  if (x < 10) x = 10;
+  if (y < 10) y = 10;
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top  = y + 'px';
+}
+
+function showNodeTooltip(nodeId, mouseX, mouseY) {
+  const html = buildNodeTooltip(nodeId);
+  if (!html) return;
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  placeTooltip(mouseX, mouseY);
+}
+
+function showWeightTooltip(key, mouseX, mouseY) {
+  const html = buildWeightTooltip(key);
+  if (!html) return;
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  placeTooltip(mouseX, mouseY);
+}
+
+function hideTooltip() {
+  tooltipEl.classList.remove('show');
+}
+
+function attachNodeTooltipEvents() {
+  ['i1','i2','h1','h2','h3','o1','o2','j'].forEach(id => {
+    const el = nodes[id];
+    el.addEventListener('mouseenter', e => showNodeTooltip(id, e.clientX, e.clientY));
+    el.addEventListener('mousemove', e => {
+      if (tooltipEl.classList.contains('show')) showNodeTooltip(id, e.clientX, e.clientY);
+    });
+    el.addEventListener('mouseleave', hideTooltip);
+  });
+}
+
+/* ================= UI HELPERS ================= */
+function setSum(nodeId, text) {
+  const el = nodes[nodeId].querySelector('.sum');
+  if (el) el.textContent = text;
+}
+function setAct(nodeId, text) {
+  const el = nodes[nodeId].querySelector('.act');
+  if (el) el.textContent = text;
+}
+
+function updateEpocaBadge() {
+  if (epocaInCorso) {
+    epocaBadge.textContent = 'Epoca ' + (epocaCount + 1) + ' (in corso)';
+  } else {
+    epocaBadge.textContent = 'Epoca ' + epocaCount;
+  }
+}
+
+// Pulisce gli stati visivi (classi active/error/forward/backward) senza toccare i pesi
+function clearVisualState() {
+  Object.values(nodes).forEach(n => n.classList.remove('active', 'error'));
+  document.querySelectorAll('.conn').forEach(l => l.classList.remove('forward', 'backward'));
+  document.querySelectorAll('.weight-badge').forEach(b => b.classList.remove('updated'));
+  ['h1','h2','h3','o1','o2'].forEach(id => setAct(id, ''));
+  setSum('j', 'err=?');
+}
+
+/* ================= RESET ================= */
+function reset() {
+  W = Object.assign({}, INITIAL_W);
+  lastUpdates = {};
+  nodeOutputs = { i1: 1, i2: 0, h1: 0, h2: 0, h3: 0, o1: 0, o2: 0 };
+  nodeErrors = { o1: 0, o2: 0, h1: 0, h2: 0, h3: 0 };
+  epocaCount = 0;
+  epocaInCorso = false;
+  successoRaggiunto = false;
+  ultimoForward = null;
+
+  clearVisualState();
+  setSum('i1', '=1');
+  setSum('i2', '=0');
+  ['h1','h2','h3','o1','o2'].forEach(id => setSum(id, 'Σ=?'));
+  setSum('j', 'err=?');
+
+  clearHistory();
+  drawConnections();
+  updateEpocaBadge();
+
+  statusEl.textContent = 'Premi "▶️ Forward Pass" per iniziare la prima epoca!';
+  document.getElementById('btnF').disabled = false;
+  document.getElementById('btnB').disabled = true;
+}
+
+/* ================= FORWARD PASS (avviato dall'utente) ================= */
+async function forwardPass() {
+  // Impedisce doppio click durante l'animazione
+  document.getElementById('btnF').disabled = true;
+  document.getElementById('btnB').disabled = true;
+
+  // Pulisce lo stato visivo precedente
+  clearVisualState();
+
+  epocaInCorso = true;
+  updateEpocaBadge();
+
+  statusEl.textContent = '➡️ Epoca ' + (epocaCount + 1) + ' — Forward Pass';
+  await sleep(400);
+
+  // Input
+  nodes.i1.classList.add('active');
+  nodes.i2.classList.add('active');
+  setAct('i1', 'uscita=1');
+  setAct('i2', 'uscita=0');
+  nodeOutputs.i1 = inputs.i1;
+  nodeOutputs.i2 = inputs.i2;
+  await sleep(500);
+
+  // Hidden
+  statusEl.textContent = '🧮 Hidden: Σ = (X₁×P₁) + (X₂×P₂) — passa il mouse sui neuroni!';
+  for (const h of ['h1','h2','h3']) {
+    const c1 = connections.find(c => c.id === 'i1-' + h);
+    const c2 = connections.find(c => c.id === 'i2-' + h);
+    const sum = inputs.i1 * W[c1.key] + inputs.i2 * W[c2.key];
+    const out = relu(sum);
+
+    document.getElementById('line-' + c1.id).classList.add('forward');
+    document.getElementById('line-' + c2.id).classList.add('forward');
+    await sleep(200);
+
+    nodes[h].classList.add('active');
+    setSum(h, 'Σ=' + sum.toFixed(1));
+    setAct(h, sum > 0 ? '⚡ ' + out.toFixed(1) : '💤 0');
+    nodeOutputs[h] = out;
+    await sleep(400);
+  }
+
+  // Output
+  statusEl.textContent = '🧮 Output: Σ = (H₁×P₁) + (H₂×P₂) + (H₃×P₃)';
+  await sleep(300);
+
+  for (const o of ['o1','o2']) {
+    const cs = [
+      connections.find(c => c.id === 'h1-' + o),
+      connections.find(c => c.id === 'h2-' + o),
+      connections.find(c => c.id === 'h3-' + o)
+    ];
+    const hs = [nodeOutputs.h1, nodeOutputs.h2, nodeOutputs.h3];
+    let sum = 0;
+    for (let i = 0; i < 3; i++) sum += hs[i] * W[cs[i].key];
+    const out = relu(sum);
+
+    cs.forEach(c => document.getElementById('line-' + c.id).classList.add('forward'));
+    await sleep(200);
+
+    nodes[o].classList.add('active');
+    setSum(o, 'Σ=' + sum.toFixed(1));
+    setAct(o, sum > 0 ? '⚡ ' + out.toFixed(1) : '💤 0');
+    nodeOutputs[o] = out;
+    await sleep(400);
+  }
+
+  // Judge
+  document.getElementById('line-o1-j').classList.add('forward');
+  document.getElementById('line-o2-j').classList.add('forward');
+  nodes.j.classList.add('active');
+  await sleep(400);
+
+  const pred = nodeOutputs.o1 > nodeOutputs.o2 ? 'CANE' : 'GATTO';
+  const success = pred === 'GATTO';
+  setSum('j', success ? 'err=0' : 'err=+3');
+
+  // Registra nello storico
+  epocaCount++;
+  ultimoForward = {
+    sumCane: nodeOutputs.o1,
+    sumGatto: nodeOutputs.o2,
+    success: success
+  };
+  addHistoryRow(epocaCount, nodeOutputs.o1, nodeOutputs.o2, success);
+  updateEpocaBadge();
+
+  if (success) {
+    successoRaggiunto = true;
+    epocaInCorso = false;
+    statusEl.textContent =
+      '🎉 Epoca ' + epocaCount + ' — SUCCESSO! La rete dice 🐱 GATTO (Σ=' +
+      nodeOutputs.o2.toFixed(1) + ' > Σ Cane=' + nodeOutputs.o1.toFixed(1) + ')';
+    document.getElementById('btnF').disabled = true; // niente più epoche
+    document.getElementById('btnB').disabled = true;
+  } else {
+    statusEl.textContent =
+      '❌ Epoca ' + epocaCount + ' — SBAGLIATO: dice CANE. Premi "◀️ Backpropagation" per correggere i pesi.';
+    document.getElementById('btnF').disabled = true;
+    document.getElementById('btnB').disabled = false;
+  }
+}
+
+/* ================= BACKPROP (avviato dall'utente) ================= */
+async function backwardPass() {
+  document.getElementById('btnF').disabled = true;
+  document.getElementById('btnB').disabled = true;
+
+  statusEl.textContent = '⬅️ Backpropagation — la colpa torna indietro';
+  await sleep(400);
+
+  // Judge
+  nodes.j.classList.remove('active');
+  nodes.j.classList.add('error');
+  setSum('j', 'err=+3 (Gatto)');
+  nodeErrors.o1 = -3;
+  nodeErrors.o2 = +3;
+  await sleep(700);
+
+  // Output
+  ['o1-j','o2-j'].forEach(id => {
+    const l = document.getElementById('line-' + id);
+    l.classList.remove('forward');
+    l.classList.add('backward');
+  });
+  nodes.o1.classList.remove('active'); nodes.o1.classList.add('error');
+  nodes.o2.classList.remove('active'); nodes.o2.classList.add('error');
+  setAct('o1', 'err=-3');
+  setAct('o2', 'err=+3');
+  await sleep(800);
+
+  // Hidden
+  ['h1-o1','h1-o2','h2-o1','h2-o2','h3-o1','h3-o2'].forEach(id => {
+    const l = document.getElementById('line-' + id);
+    l.classList.remove('forward');
+    l.classList.add('backward');
+  });
+  nodeErrors.h1 = +0.4;
+  nodeErrors.h2 = +0.6;
+  nodeErrors.h3 = -0.2;
+  ['h1','h2','h3'].forEach(h => {
+    nodes[h].classList.remove('active');
+    nodes[h].classList.add('error');
+    setAct(h, 'err=' + (nodeErrors[h] > 0 ? '+' : '') + nodeErrors[h].toFixed(1));
+  });
+  await sleep(800);
+
+  // Input
+  ['i1-h1','i1-h2','i1-h3','i2-h1','i2-h2','i2-h3'].forEach(id => {
+    const l = document.getElementById('line-' + id);
+    l.classList.remove('forward');
+    l.classList.add('backward');
+  });
+  ['i1','i2'].forEach(i => {
+    nodes[i].classList.remove('active');
+    nodes[i].classList.add('error');
+  });
+  await sleep(800);
+
+  // Aggiornamento pesi
+  statusEl.textContent = '🔧 Aggiornamento: Nuovo Peso = Vecchio + (Errore × 0.1) — passa il mouse sui pesi!';
+  await sleep(400);
+
+  const updates = [
+    { key:'h1->o1', err: -3 },
+    { key:'h2->o1', err: -3 },
+    { key:'h3->o1', err: -3 },
+    { key:'h1->o2', err: +3 },
+    { key:'h2->o2', err: +3 },
+    { key:'h3->o2', err: +3 },
+    { key:'i1->h1', err: +0.4 },
+    { key:'i2->h1', err: +0.4 },
+    { key:'i1->h2', err: +0.6 },
+    { key:'i2->h2', err: +0.6 },
+    { key:'i1->h3', err: -0.2 },
+    { key:'i2->h3', err: -0.2 }
+  ];
+
+  const learningRate = 0.1;
+
+  for (const u of updates) {
+    const oldW = W[u.key];
+    const delta = u.err * learningRate;
+    const newW = +(oldW + delta).toFixed(2);
+
+    lastUpdates[u.key] = { old: oldW, delta: delta, new: newW, err: u.err };
+    W[u.key] = newW;
+
+    const c = connections.find(x => x.key === u.key);
+    const badge = document.getElementById('badge-' + c.id);
+    badge.textContent = fmtW(newW);
+    badge.classList.add('updated');
+
+    updatePanel();
+    await sleep(180);
+  }
+
+  // Fine backprop: l'utente deve premere di nuovo Forward
+  epocaInCorso = false;
+  updateEpocaBadge();
+
+  statusEl.textContent =
+    '✅ Pesi aggiornati! Premi "▶️ Forward Pass" per l\'epoca ' + (epocaCount + 1) + '.';
+
+  document.getElementById('btnF').disabled = false;
+  document.getElementById('btnB').disabled = true;
+}
+
+/* ================= INIT ================= */
+window.addEventListener('load', () => {
+  layoutNodes();
+  drawConnections();
+  attachNodeTooltipEvents();
+  reset();
+});
+</script>
+</body>
+</html>
